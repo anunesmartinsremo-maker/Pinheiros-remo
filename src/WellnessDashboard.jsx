@@ -1,163 +1,119 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
-// ─── DEMO DATA ─────────────────────────────────────────────────────────────
-const TODAY = "06/06/2026";
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const SHEET_ID = "1V5b0Wxbgc7SfYIIG58aFofHAXhvAGqg90is246N_6XU";
 
-const DEMO_ATHLETES = [
-  { ID:"REM-2026-001", Nome:"OLAVO VINICIUS SOARES PELEGRINO", Categoria:"Sênior",   Ativo:"Sim" },
-  { ID:"REM-2026-002", Nome:"ALEF DA ROSA FONTOURA",           Categoria:"Sênior",   Ativo:"Sim" },
-  { ID:"REM-2026-003", Nome:"BRENO BARTOLOZZI MENEGHINI",      Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-004", Nome:"FELIPE TADASHI OLIVEIRA MATSUDA", Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-005", Nome:"GUSTAVO DE OLIVEIRA SANTOS",      Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-006", Nome:"MATEUS ALMEIDA SANT'ANA",         Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-007", Nome:"PEDRO HENRIQUE R. MENDES",        Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-008", Nome:"RAFAELA BEATRIZ VELSCH POCHINI",  Categoria:"Sub-23",   Ativo:"Sim" },
-  { ID:"REM-2026-009", Nome:"CLAUDIA CICERO SANTOS",           Categoria:"Pararemo", Ativo:"Sim" },
-  { ID:"REM-2026-010", Nome:"JAIRO NATANAEL FROHLICH KLUG",    Categoria:"Pararemo", Ativo:"Sim" },
-  { ID:"REM-2026-011", Nome:"GABRIEL MENDE DE SOUZA",          Categoria:"Pararemo", Ativo:"Sim" },
-  { ID:"REM-2026-012", Nome:"ALINA DUMAS",                     Categoria:"Pararemo", Ativo:"Sim" },
-];
+function sheetUrl(sheetName) {
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+}
 
-// Semana atual: 02/06 a 06/06 | Semana anterior: 26/05 a 01/06
-const DEMO_WELLNESS = [
-  // ── ALEF (REM-2026-002) ─────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"1", Motivacao:"4", FC_Repouso:"52", HRV_VFC:"68", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"51", HRV_VFC:"70", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"28/05/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", FC_Repouso:"50", HRV_VFC:"72", Score_Wellness:"4.00", Estado_Geral:"" },
-  { Timestamp:"29/05/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"1", Motivacao:"4", FC_Repouso:"53", HRV_VFC:"65", Score_Wellness:"3.75", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"1", Motivacao:"4", FC_Repouso:"52", HRV_VFC:"67", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"3", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"54", HRV_VFC:"63", Score_Wellness:"3.65", Estado_Geral:"" },
-  { Timestamp:"04/06/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"4", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", FC_Repouso:"51", HRV_VFC:"71", Score_Wellness:"3.90", Estado_Geral:"" },
-  { Timestamp:"05/06/2026 07:10:00", ID_Atleta:"REM-2026-002", Qualidade_Sono:"3", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"55", HRV_VFC:"60", Score_Wellness:"3.70", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:19:47", ID_Atleta:"REM-2026-002", Qualidade_Sono:"2", Fadiga:"2", Dor_Muscular:"1", Motivacao:"4", FC_Repouso:"57", HRV_VFC:"58", Score_Wellness:"3.60", Estado_Geral:"Dormi mal por rinite, mas estou bem pra treinar" },
+// ─── CSV PARSER ────────────────────────────────────────────────────────────
+function parseCSVLine(line) {
+  const result = [];
+  let cur = "", inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuote = !inQuote; }
+    else if (c === "," && !inQuote) { result.push(cur); cur = ""; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
 
-  // ── BRENO (REM-2026-003) ─────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"4", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"3.75", Estado_Geral:"" },
-  { Timestamp:"28/05/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"2", Motivacao:"5", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"4.00", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"5", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"04/06/2026 07:10:00", ID_Atleta:"REM-2026-003", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"2", Motivacao:"5", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"4.00", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:08:52", ID_Atleta:"REM-2026-003", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"4", FC_Repouso:"", HRV_VFC:"", Score_Wellness:"3.80", Estado_Geral:"Bem" },
-
-  // ── FELIPE (REM-2026-004) ────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"58", HRV_VFC:"", Score_Wellness:"3.70", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"3", Motivacao:"3", Score_Wellness:"3.40", Estado_Geral:"" },
-  { Timestamp:"28/05/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.60", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"3", Motivacao:"3", FC_Repouso:"60", Score_Wellness:"3.35", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"3", Fadiga:"3", Dor_Muscular:"3", Motivacao:"3", FC_Repouso:"62", Score_Wellness:"3.10", Estado_Geral:"" },
-  { Timestamp:"04/06/2026 07:10:00", ID_Atleta:"REM-2026-004", Qualidade_Sono:"3", Fadiga:"4", Dor_Muscular:"4", Motivacao:"2", FC_Repouso:"64", Score_Wellness:"2.85", Estado_Geral:"Cansado" },
-  { Timestamp:"06/06/2026 14:02:31", ID_Atleta:"REM-2026-004", Qualidade_Sono:"4", Fadiga:"4", Dor_Muscular:"4", Motivacao:"2", FC_Repouso:"66", HRV_VFC:"", Score_Wellness:"2.60", Estado_Geral:"Mediano" },
-
-  // ── MATEUS (REM-2026-006) ────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-006", Qualidade_Sono:"4", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", Score_Wellness:"4.10", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-006", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", Score_Wellness:"4.20", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-006", Qualidade_Sono:"4", Fadiga:"1", Dor_Muscular:"1", Motivacao:"4", Score_Wellness:"3.95", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-006", Qualidade_Sono:"4", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", Score_Wellness:"4.00", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 06:53:01", ID_Atleta:"REM-2026-006", Qualidade_Sono:"3", Fadiga:"1", Dor_Muscular:"1", Motivacao:"4", Score_Wellness:"3.90", Estado_Geral:"Estou bem, sem dores específicas e descansando." },
-
-  // ── PEDRO (REM-2026-007) ─────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-007", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.75", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-007", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-007", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"3", Score_Wellness:"3.50", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-007", Qualidade_Sono:"3", Fadiga:"3", Dor_Muscular:"3", Motivacao:"3", Score_Wellness:"3.20", Estado_Geral:"" },
-  { Timestamp:"04/06/2026 07:10:00", ID_Atleta:"REM-2026-007", Qualidade_Sono:"3", Fadiga:"3", Dor_Muscular:"3", Motivacao:"2", Score_Wellness:"3.10", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 09:43:50", ID_Atleta:"REM-2026-007", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"3", Motivacao:"2", Score_Wellness:"3.05", Estado_Geral:"Bem, mas um pouco cansado" },
-
-  // ── RAFAELA (REM-2026-008) ───────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-008", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"1", Motivacao:"4", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-008", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", Score_Wellness:"4.10", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-008", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.75", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-008", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.70", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:04:12", ID_Atleta:"REM-2026-008", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"1", Motivacao:"3", Score_Wellness:"3.70", Estado_Geral:"Dor de cabeça" },
-
-  // ── CLAUDIA (REM-2026-009) ───────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-009", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"55", HRV_VFC:"62", Score_Wellness:"3.80", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-009", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"54", HRV_VFC:"65", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"28/05/2026 07:10:00", ID_Atleta:"REM-2026-009", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"1", Motivacao:"5", FC_Repouso:"52", HRV_VFC:"70", Score_Wellness:"4.00", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-009", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", FC_Repouso:"56", HRV_VFC:"60", Score_Wellness:"3.70", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-009", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"3", Motivacao:"4", FC_Repouso:"57", HRV_VFC:"58", Score_Wellness:"3.55", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:15:52", ID_Atleta:"REM-2026-009", Qualidade_Sono:"4", Fadiga:"3", Dor_Muscular:"3", Motivacao:"4", FC_Repouso:"55", HRV_VFC:"61", Score_Wellness:"3.55", Estado_Geral:"Estou bem." },
-
-  // ── GABRIEL (REM-2026-011) ───────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-011", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"4", FC_Repouso:"48", HRV_VFC:"75", Score_Wellness:"3.75", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-011", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"5", FC_Repouso:"47", HRV_VFC:"78", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-011", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"3", Motivacao:"5", FC_Repouso:"48", HRV_VFC:"76", Score_Wellness:"3.85", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-011", Qualidade_Sono:"5", Fadiga:"1", Dor_Muscular:"2", Motivacao:"5", FC_Repouso:"46", HRV_VFC:"80", Score_Wellness:"4.10", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:25:39", ID_Atleta:"REM-2026-011", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"4", Motivacao:"5", FC_Repouso:"45", HRV_VFC:"", Score_Wellness:"3.85", Estado_Geral:"Um pouco de incômodo nas costas" },
-
-  // ── ALINA (REM-2026-012) ─────────────────────────────────────────────────
-  { Timestamp:"26/05/2026 07:10:00", ID_Atleta:"REM-2026-012", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"4", Score_Wellness:"3.70", Estado_Geral:"" },
-  { Timestamp:"27/05/2026 07:10:00", ID_Atleta:"REM-2026-012", Qualidade_Sono:"4", Fadiga:"2", Dor_Muscular:"2", Motivacao:"3", Score_Wellness:"3.50", Estado_Geral:"" },
-  { Timestamp:"02/06/2026 07:10:00", ID_Atleta:"REM-2026-012", Qualidade_Sono:"3", Fadiga:"2", Dor_Muscular:"3", Motivacao:"3", Score_Wellness:"3.20", Estado_Geral:"" },
-  { Timestamp:"03/06/2026 07:10:00", ID_Atleta:"REM-2026-012", Qualidade_Sono:"3", Fadiga:"3", Dor_Muscular:"3", Motivacao:"2", Score_Wellness:"3.00", Estado_Geral:"" },
-  { Timestamp:"06/06/2026 07:17:56", ID_Atleta:"REM-2026-012", Qualidade_Sono:"3", Fadiga:"2", Dor_Muscular:"3", Motivacao:"2", Score_Wellness:"3.00", Estado_Geral:"" },
-];
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]).map(h => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map(line => {
+    const values = parseCSVLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (values[i] || "").trim().replace(/^"|"$/g, ""); });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v));
+}
 
 // ─── UTILS ─────────────────────────────────────────────────────────────────
 function parseNum(s) {
-  const n = parseFloat(String(s||"").replace(",",".").trim());
+  const n = parseFloat(String(s || "").replace(",", ".").trim());
   return isNaN(n) ? null : n;
 }
+
 function parseDate(s) {
   if (!s) return null;
-  const [dp] = s.split(" ");
-  const [d,m,y] = dp.split("/");
-  return new Date(`${y}-${m}-${d}`);
+  // handles "06/06/2026 07:04:12" or "2026-06-06"
+  const dp = s.split(" ")[0];
+  if (dp.includes("/")) {
+    const [d, m, y] = dp.split("/");
+    return new Date(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+  }
+  return new Date(dp);
 }
-function avg(arr) {
-  const v = arr.filter(x=>x!=null);
-  return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
-}
-function initials(name) {
-  const p = name.trim().split(" ").filter(Boolean);
-  return p.length===1 ? p[0][0].toUpperCase() : (p[0][0]+p[p.length-1][0]).toUpperCase();
-}
-function firstName(name) { return name?.trim().split(" ")[0]||"?"; }
 
-function weekBounds(offsetWeeks=0) {
+function todayStr() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+}
+
+function daysAgo(n) {
+  const d = new Date(); d.setDate(d.getDate() - n); d.setHours(0,0,0,0); return d;
+}
+
+function weekBounds(offsetWeeks = 0) {
   const now = new Date();
-  const day = now.getDay();
-  const monday = new Date(now); monday.setDate(now.getDate()-day+1+(offsetWeeks*7));
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - now.getDay() + 1 + offsetWeeks * 7);
   monday.setHours(0,0,0,0);
-  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
-  sunday.setHours(23,59,59,999);
-  return { start:monday, end:sunday };
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
+  return { start: monday, end: sunday };
 }
 
-// Score status
+function avg(arr) {
+  const v = arr.filter(x => x != null);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+function initials(name) {
+  if (!name) return "?";
+  const p = name.trim().split(" ").filter(Boolean);
+  return p.length === 1 ? p[0][0].toUpperCase() : (p[0][0] + p[p.length-1][0]).toUpperCase();
+}
+
+function firstName(name) { return name?.trim().split(" ")[0] || "?"; }
+
+// ─── STATUS LOGIC ──────────────────────────────────────────────────────────
 function scoreStatus(today, baseline) {
-  if (today==null) return "none";
-  if (baseline==null) return today>=3.5?"green":today>=2.8?"yellow":"red";
-  const drop=((baseline-today)/baseline)*100;
-  if (drop>=15||today<2.8) return "red";
-  if (drop>=8) return "yellow";
+  if (today == null) return "none";
+  if (baseline == null) return today >= 3.5 ? "green" : today >= 2.8 ? "yellow" : "red";
+  const drop = ((baseline - today) / baseline) * 100;
+  if (drop >= 15 || today < 2.8) return "red";
+  if (drop >= 8) return "yellow";
   return "green";
 }
-// HRV status (higher = better)
+
 function hrvStatus(today, baseline) {
-  if (today==null) return null;
-  if (baseline==null) return "info";
-  const pct=((today-baseline)/baseline)*100;
-  if (pct<=-15) return "red";
-  if (pct<=-8)  return "yellow";
+  if (today == null) return null;
+  if (baseline == null) return "info";
+  const pct = ((today - baseline) / baseline) * 100;
+  if (pct <= -15) return "red";
+  if (pct <= -8) return "yellow";
   return "green";
 }
-// FC status (lower = better)
+
 function fcStatus(today, baseline) {
-  if (today==null) return null;
-  if (baseline==null) return "info";
-  const pct=((today-baseline)/baseline)*100;
-  if (pct>=10) return "red";
-  if (pct>=5)  return "yellow";
+  if (today == null) return null;
+  if (baseline == null) return "info";
+  const pct = ((today - baseline) / baseline) * 100;
+  if (pct >= 10) return "red";
+  if (pct >= 5) return "yellow";
   return "green";
 }
-// Weekly trend
-function trendStatus(thisWeekAvg, lastWeekAvg) {
-  if (thisWeekAvg==null||lastWeekAvg==null) return null;
-  const diff=thisWeekAvg-lastWeekAvg;
-  if (diff>=0.15) return "up";
-  if (diff<=-0.15) return "down";
+
+function trendStatus(thisW, lastW) {
+  if (thisW == null || lastW == null) return null;
+  const diff = thisW - lastW;
+  if (diff >= 0.15) return "up";
+  if (diff <= -0.15) return "down";
   return "stable";
 }
 
@@ -168,12 +124,14 @@ const SC = {
   none:   { bg:"#374151", glow:"rgba(55,65,81,.06)",   label:"Sem dado", emoji:"⚪" },
   info:   { bg:"#3b82f6", glow:"rgba(59,130,246,.1)",  label:"Novo",     emoji:"🔵" },
 };
+
 const TREND = {
   up:     { icon:"↗", color:"#22c55e", label:"Subindo"  },
   stable: { icon:"→", color:"#f59e0b", label:"Estável"  },
   down:   { icon:"↘", color:"#ef4444", label:"Caindo"   },
 };
 
+// ─── COLORS ────────────────────────────────────────────────────────────────
 const C = {
   bg:"#070b12", surf:"#0d1421", surfHi:"#131e30",
   border:"#1a2840", blue:"#1a4fa0", blueLt:"#3b82f6",
@@ -192,23 +150,24 @@ const GS = `
 
 // ─── SPARKLINE ─────────────────────────────────────────────────────────────
 function Spark({ scores, color }) {
-  const valid = scores.filter(s=>s!=null);
-  if (valid.length<2) return null;
-  const w=72,h=22,p=2;
-  const mn=Math.min(...valid),mx=Math.max(...valid),rng=mx-mn||0.5;
-  const allScores = scores.map(v=>v??mn);
-  const pts=allScores.map((v,i)=>{
-    const x=p+(i/(allScores.length-1))*(w-p*2);
-    const y=p+(1-(v-mn)/rng)*(h-p*2);
+  const valid = scores.filter(s => s != null);
+  if (valid.length < 2) return null;
+  const w=72, h=22, p=2;
+  const mn=Math.min(...valid), mx=Math.max(...valid), rng=mx-mn||0.5;
+  const pts = scores.map((v,i) => {
+    const val = v ?? mn;
+    const x = p + (i/(scores.length-1))*(w-p*2);
+    const y = p + (1-(val-mn)/rng)*(h-p*2);
     return `${x},${y}`;
   }).join(" ");
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <polyline points={pts} fill="none" stroke={color||C.blueLt} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".7"/>
-      {allScores.map((v,i)=>{
-        const x=p+(i/(allScores.length-1))*(w-p*2);
-        const y=p+(1-(v-mn)/rng)*(h-p*2);
-        return <circle key={i} cx={x} cy={y} r={i===allScores.length-1?2.5:1.5} fill={i===allScores.length-1?(color||C.blueLt):"rgba(59,130,246,.35)"}/>;
+      {scores.map((v,i) => {
+        const val = v??mn;
+        const x = p+(i/(scores.length-1))*(w-p*2);
+        const y = p+(1-(val-mn)/rng)*(h-p*2);
+        return <circle key={i} cx={x} cy={y} r={i===scores.length-1?2.5:1.5} fill={i===scores.length-1?(color||C.blueLt):"rgba(59,130,246,.35)"}/>;
       })}
     </svg>
   );
@@ -216,16 +175,14 @@ function Spark({ scores, color }) {
 
 // ─── METRIC PILL ───────────────────────────────────────────────────────────
 function MetricPill({ icon, label, value, unit, status }) {
-  if (value==null) return null;
-  const s = SC[status]||SC.info;
+  if (value == null) return null;
+  const s = SC[status] || SC.info;
   return (
-    <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:C.surfHi,borderRadius:6,border:`1px solid ${s.bg}30`,flex:1}}>
+    <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:C.surfHi,borderRadius:6,border:`1px solid ${s.bg}40`,flex:1}}>
       <span style={{fontSize:13}}>{icon}</span>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:9,color:C.muted,letterSpacing:1}}>{label}</div>
-        <div className="mono" style={{fontSize:13,fontWeight:700,color:s.bg,lineHeight:1}}>
-          {value}{unit}
-        </div>
+        <div className="mono" style={{fontSize:13,fontWeight:700,color:s.bg,lineHeight:1}}>{value}{unit}</div>
       </div>
       <span style={{fontSize:11}}>{s.emoji}</span>
     </div>
@@ -240,68 +197,58 @@ function AthleteCard({ data, onClick }) {
   const todayHRV   = todayEntry ? parseNum(todayEntry.HRV_VFC) : null;
   const todayFC    = todayEntry ? parseNum(todayEntry.FC_Repouso) : null;
 
-  // 7-day baseline for score
-  const recent7 = allEntries.slice(-8,-1).map(e=>parseNum(e.Score_Wellness));
-  const baseline = avg(recent7);
+  const recent7    = allEntries.slice(-8,-1).map(e => parseNum(e.Score_Wellness));
+  const baseline   = avg(recent7);
 
-  // HRV / FC baselines
-  const hrvHistory = allEntries.slice(0,-1).map(e=>parseNum(e.HRV_VFC)).filter(Boolean);
-  const fcHistory  = allEntries.slice(0,-1).map(e=>parseNum(e.FC_Repouso)).filter(Boolean);
+  const hrvHistory = allEntries.slice(0,-1).map(e => parseNum(e.HRV_VFC)).filter(Boolean);
+  const fcHistory  = allEntries.slice(0,-1).map(e => parseNum(e.FC_Repouso)).filter(Boolean);
   const hrvBaseline = avg(hrvHistory.slice(-7));
   const fcBaseline  = avg(fcHistory.slice(-7));
 
-  // Weekly scores
-  const thisWeekScores = thisWeekEntries.map(e=>parseNum(e.Score_Wellness));
-  const lastWeekScores = lastWeekEntries.map(e=>parseNum(e.Score_Wellness));
-  const thisWeekAvg = avg(thisWeekScores);
-  const lastWeekAvg = avg(lastWeekScores);
-  const trend = trendStatus(thisWeekAvg, lastWeekAvg);
-  const trendDiff = (thisWeekAvg!=null&&lastWeekAvg!=null) ? (thisWeekAvg-lastWeekAvg) : null;
+  const thisWeekAvg = avg(thisWeekEntries.map(e => parseNum(e.Score_Wellness)));
+  const lastWeekAvg = avg(lastWeekEntries.map(e => parseNum(e.Score_Wellness)));
+  const trend       = trendStatus(thisWeekAvg, lastWeekAvg);
+  const trendDiff   = (thisWeekAvg != null && lastWeekAvg != null) ? thisWeekAvg - lastWeekAvg : null;
 
   const status = scoreStatus(todayScore, baseline);
   const s = SC[status];
-
-  // Sparkline — últimos 7 dias
-  const spark7 = allEntries.slice(-7).map(e=>parseNum(e.Score_Wellness));
+  const spark7 = allEntries.slice(-7).map(e => parseNum(e.Score_Wellness));
 
   return (
-    <div onClick={onClick} style={{
-      position:"relative",background:C.surf,borderRadius:12,padding:16,cursor:"pointer",
-      border:`1px solid ${status==="none"?C.border:s.bg}`,
-      borderLeft:`4px solid ${s.bg}`,overflow:"hidden",
-      transition:"transform .15s,box-shadow .15s",
-    }}
-    onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 24px ${s.glow}`;}}
-    onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+    <div onClick={onClick}
+      style={{position:"relative",background:C.surf,borderRadius:12,padding:16,cursor:"pointer",
+        border:`1px solid ${status==="none"?C.border:s.bg}`,borderLeft:`4px solid ${s.bg}`,
+        overflow:"hidden",transition:"transform .15s,box-shadow .15s"}}
+      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 24px ${s.glow}`;}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
 
       <div style={{position:"absolute",inset:0,background:s.glow,pointerEvents:"none"}}/>
       <div style={{position:"relative"}}>
 
-        {/* Row 1: Avatar + Name + Score */}
+        {/* Avatar + name + score */}
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-          <div style={{
-            width:44,height:44,borderRadius:"50%",background:s.bg,flexShrink:0,
+          <div style={{width:44,height:44,borderRadius:"50%",background:s.bg,flexShrink:0,
             display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:16,fontWeight:900,color:"#fff",letterSpacing:1,
-            boxShadow:`0 0 12px ${s.bg}50`
-          }}>{initials(athlete.Nome)}</div>
-
+            fontSize:16,fontWeight:900,color:"#fff",letterSpacing:1,boxShadow:`0 0 12px ${s.bg}50`}}>
+            {initials(athlete.Nome||athlete.name||"")}
+          </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:800,fontSize:15,lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-              {firstName(athlete.Nome)}
+              {firstName(athlete.Nome||athlete.name||"")}
             </div>
-            <div style={{fontSize:10,color:C.muted,marginTop:2,letterSpacing:1}}>{athlete.Categoria.toUpperCase()}</div>
+            <div style={{fontSize:10,color:C.muted,marginTop:2,letterSpacing:1}}>
+              {(athlete.Categoria||athlete.category||"").toUpperCase()}
+            </div>
           </div>
-
           <div style={{textAlign:"right",flexShrink:0}}>
             <div style={{fontSize:9,color:C.muted,letterSpacing:1}}>HOJE</div>
             <div className="mono" style={{fontSize:22,fontWeight:700,color:s.bg,lineHeight:1}}>
-              {todayScore!=null?todayScore.toFixed(2):"—"}
+              {todayScore != null ? todayScore.toFixed(2) : "—"}
             </div>
           </div>
         </div>
 
-        {/* Row 2: Status badge + weekly trend */}
+        {/* Status + trend */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <span style={{background:s.bg,color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:4,letterSpacing:1}}>
             {s.emoji} {s.label.toUpperCase()}
@@ -311,26 +258,24 @@ function AthleteCard({ data, onClick }) {
               <span style={{fontSize:10,color:C.muted}}>Semana:</span>
               <span style={{fontSize:13,fontWeight:800,color:TREND[trend].color}}>{TREND[trend].icon}</span>
               <span style={{fontSize:10,color:TREND[trend].color}}>
-                {trendDiff!=null?(trendDiff>0?"+":"")+trendDiff.toFixed(2):""}
+                {trendDiff != null ? (trendDiff > 0 ? "+" : "") + trendDiff.toFixed(2) : ""}
               </span>
             </div>
           )}
         </div>
 
-        {/* Row 3: Sparkline + avg */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
+        {/* Sparkline */}
+        {spark7.some(v=>v!=null) && (
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <span style={{fontSize:9,color:C.muted,letterSpacing:1}}>7D</span>
-            <Spark scores={spark7} color={s.bg}/>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <Spark scores={spark7} color={s.bg}/>
+              {baseline!=null&&<span style={{fontSize:11,color:C.muted}}>base: <span className="mono" style={{color:C.text}}>{baseline.toFixed(2)}</span></span>}
+            </div>
           </div>
-          {baseline!=null&&(
-            <span style={{fontSize:11,color:C.muted}}>
-              base: <span className="mono" style={{color:C.text}}>{baseline.toFixed(2)}</span>
-            </span>
-          )}
-        </div>
+        )}
 
-        {/* Row 4: HRV + FC pills (only if data exists) */}
+        {/* HRV + FC pills */}
         {(todayHRV!=null||todayFC!=null) && (
           <div style={{display:"flex",gap:6,marginBottom:10}}>
             {todayHRV!=null&&<MetricPill icon="📊" label="HRV" value={todayHRV} unit="ms" status={hrvStatus(todayHRV,hrvBaseline)}/>}
@@ -338,13 +283,13 @@ function AthleteCard({ data, onClick }) {
           </div>
         )}
 
-        {/* Row 5: Observation */}
-        {todayEntry?.Estado_Geral&&(
+        {/* Observation */}
+        {todayEntry?.Estado_Geral && (
           <div style={{fontSize:11,color:C.muted,fontStyle:"italic",borderTop:`1px solid ${C.border}`,paddingTop:8,lineHeight:1.4}}>
             "{todayEntry.Estado_Geral}"
           </div>
         )}
-        {!todayEntry&&(
+        {!todayEntry && (
           <div style={{fontSize:11,color:C.muted,textAlign:"center",paddingTop:6,borderTop:`1px solid ${C.border}`}}>
             Não respondeu hoje
           </div>
@@ -365,14 +310,11 @@ function Detail({ data, onClose }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
       onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{
-        background:C.surf,border:`1px solid ${C.border}`,borderRadius:14,
-        padding:24,width:"100%",maxWidth:500,maxHeight:"88vh",overflowY:"auto"
-      }}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:14,padding:24,width:"100%",maxWidth:500,maxHeight:"88vh",overflowY:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
           <div>
-            <div style={{fontSize:20,fontWeight:900}}>{athlete.Nome}</div>
-            <div style={{fontSize:12,color:C.muted,marginTop:2}}>{athlete.Categoria} · {athlete.ID}</div>
+            <div style={{fontSize:20,fontWeight:900}}>{athlete.Nome||athlete.name}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>{athlete.Categoria||athlete.category} · {athlete.ID||athlete.id}</div>
           </div>
           <button onClick={onClose} style={{background:C.surfHi,border:"none",color:C.text,borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:16,fontFamily:"inherit"}}>✕</button>
         </div>
@@ -396,15 +338,15 @@ function Detail({ data, onClose }) {
           {sorted.length===0&&<div style={{color:C.muted,fontSize:13}}>Sem registros.</div>}
           {sorted.map((e,i)=>{
             const score=parseNum(e.Score_Wellness);
-            const status=scoreStatus(score,null);
-            const s=SC[status];
+            const st=scoreStatus(score,null);
+            const ss=SC[st];
             const hrv=parseNum(e.HRV_VFC);
             const fc=parseNum(e.FC_Repouso);
             return(
-              <div key={i} style={{padding:"10px 12px",background:C.surfHi,borderRadius:8,border:`1px solid ${C.border}`,borderLeft:`3px solid ${s.bg}`}}>
+              <div key={i} style={{padding:"10px 12px",background:C.surfHi,borderRadius:8,border:`1px solid ${C.border}`,borderLeft:`3px solid ${ss.bg}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <span className="mono" style={{fontSize:11,color:C.muted}}>{e.Timestamp?.slice(0,10)}</span>
-                  <span className="mono" style={{fontSize:16,fontWeight:700,color:s.bg}}>{score!=null?score.toFixed(2):"—"}</span>
+                  <span className="mono" style={{fontSize:16,fontWeight:700,color:ss.bg}}>{score!=null?score.toFixed(2):"—"}</span>
                 </div>
                 <div style={{fontSize:11,color:C.muted,marginBottom:3}}>
                   {[e.Qualidade_Sono&&`Sono:${e.Qualidade_Sono}`,e.Fadiga&&`Fad:${e.Fadiga}`,e.Dor_Muscular&&`Dor:${e.Dor_Muscular}`,e.Motivacao&&`Mot:${e.Motivacao}`].filter(Boolean).join(" · ")}
@@ -427,20 +369,19 @@ function Detail({ data, onClose }) {
 
 // ─── TEAM TREND PANEL ──────────────────────────────────────────────────────
 function TeamTrendPanel({ allData }) {
-  const trends = allData.map(d=>{
-    const tw=avg(d.thisWeekEntries.map(e=>parseNum(e.Score_Wellness)));
-    const lw=avg(d.lastWeekEntries.map(e=>parseNum(e.Score_Wellness)));
+  const trends = allData.map(d => {
+    const tw = avg(d.thisWeekEntries.map(e=>parseNum(e.Score_Wellness)));
+    const lw = avg(d.lastWeekEntries.map(e=>parseNum(e.Score_Wellness)));
     return trendStatus(tw,lw);
   });
   const up=trends.filter(t=>t==="up").length;
   const stable=trends.filter(t=>t==="stable").length;
   const down=trends.filter(t=>t==="down").length;
   const noData=trends.filter(t=>t===null).length;
-
   return(
-    <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 16px",marginBottom:16}}>
-      <div style={{fontSize:10,color:C.muted,letterSpacing:2,marginBottom:10}}>TENDÊNCIA DA EQUIPE — SEMANA ATUAL vs SEMANA ANTERIOR</div>
-      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+    <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+      <div style={{fontSize:10,color:C.muted,letterSpacing:2,marginBottom:10}}>TENDÊNCIA DA EQUIPE — SEMANA ATUAL vs ANTERIOR</div>
+      <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
         {[
           {icon:"↗",color:"#22c55e",label:"Melhorando",val:up},
           {icon:"→",color:"#f59e0b",label:"Estável",val:stable},
@@ -460,125 +401,189 @@ function TeamTrendPanel({ allData }) {
   );
 }
 
-// ─── MAIN ──────────────────────────────────────────────────────────────────
+// ─── MAIN DASHBOARD ────────────────────────────────────────────────────────
 export default function WellnessDashboard() {
-  const [selected, setSelected] = useState(null);
-  const [filter, setFilter] = useState("todos");
+  const [athletes,  setAthletes]  = useState([]);
+  const [wellness,  setWellness]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const [lastUpdate,setLastUpdate]= useState(null);
+  const [selected,  setSelected]  = useState(null);
+  const [filter,    setFilter]    = useState("todos");
 
+  async function fetchSheet(name) {
+    const res = await fetch(sheetUrl(name));
+    if (!res.ok) throw new Error(`Erro ao carregar aba ${name} (${res.status})`);
+    const text = await res.text();
+    return parseCSV(text);
+  }
+
+  async function load() {
+    try {
+      setLoading(true); setError(null);
+      const [ath, well] = await Promise.all([
+        fetchSheet("ATLETAS"),
+        fetchSheet("RESPOSTAS_WELLNESS"),
+      ]);
+      setAthletes(ath.filter(a => (a.Ativo||"").trim() === "Sim"));
+      setWellness(well);
+      setLastUpdate(new Date());
+    } catch(e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const today    = todayStr();
+  const ago30    = daysAgo(30);
   const thisWeek = weekBounds(0);
   const lastWeek = weekBounds(-1);
 
-  const allData = useMemo(()=>{
-    return DEMO_ATHLETES.map(ath=>{
-      const mine = DEMO_WELLNESS.filter(w=>w.ID_Atleta===ath.ID)
-        .sort((a,b)=>a.Timestamp.localeCompare(b.Timestamp));
-      const todayEntry = [...mine].reverse().find(w=>w.Timestamp?.startsWith(TODAY));
-      const thisWeekEntries = mine.filter(w=>{ const d=parseDate(w.Timestamp); return d&&d>=thisWeek.start&&d<=thisWeek.end; });
-      const lastWeekEntries = mine.filter(w=>{ const d=parseDate(w.Timestamp); return d&&d>=lastWeek.start&&d<=lastWeek.end; });
-      return { athlete:ath, todayEntry, thisWeekEntries, lastWeekEntries, allEntries:mine };
-    });
-  },[]);
+  const allData = useMemo(() => {
+    return athletes.map(ath => {
+      // Match by ID or name (handles both sheet formats)
+      const mine = wellness.filter(w => {
+        const wId = (w.ID_Atleta||"").trim();
+        const aId = (ath.ID||"").trim();
+        return wId === aId;
+      }).sort((a,b) => a.Timestamp.localeCompare(b.Timestamp));
 
-  const responded = allData.filter(d=>d.todayEntry).length;
-  const alerts = allData.filter(d=>{
-    const s=d.todayEntry?parseNum(d.todayEntry.Score_Wellness):null;
-    const b7=d.allEntries.slice(-8,-1).map(e=>parseNum(e.Score_Wellness));
-    return scoreStatus(s,avg(b7))==="red";
+      const todayEntry = [...mine].reverse().find(w => w.Timestamp?.startsWith(today));
+
+      const filterRange = (arr, start, end) => arr.filter(w => {
+        const d = parseDate(w.Timestamp); return d && d >= start && d <= end;
+      });
+
+      return {
+        athlete: ath,
+        todayEntry,
+        thisWeekEntries: filterRange(mine, thisWeek.start, thisWeek.end),
+        lastWeekEntries: filterRange(mine, lastWeek.start, lastWeek.end),
+        allEntries: mine,
+      };
+    });
+  }, [athletes, wellness, today]);
+
+  const responded = allData.filter(d => d.todayEntry).length;
+  const alerts = allData.filter(d => {
+    const s = d.todayEntry ? parseNum(d.todayEntry.Score_Wellness) : null;
+    const b = avg(d.allEntries.slice(-8,-1).map(e=>parseNum(e.Score_Wellness)));
+    return scoreStatus(s, b) === "red";
   }).length;
 
-  const filtered = allData.filter(d=>{
-    if(filter==="alerta"){
-      const s=d.todayEntry?parseNum(d.todayEntry.Score_Wellness):null;
-      const b7=avg(d.allEntries.slice(-8,-1).map(e=>parseNum(e.Score_Wellness)));
-      return scoreStatus(s,b7)==="red";
+  const categories = [...new Set(athletes.map(a => a.Categoria).filter(Boolean))];
+
+  const filtered = allData.filter(d => {
+    if (filter === "alerta") {
+      const s = d.todayEntry ? parseNum(d.todayEntry.Score_Wellness) : null;
+      const b = avg(d.allEntries.slice(-8,-1).map(e=>parseNum(e.Score_Wellness)));
+      return scoreStatus(s,b) === "red";
     }
-    if(filter==="sem-resposta") return !d.todayEntry;
-    if(filter==="caindo"){
-      const tw=avg(d.thisWeekEntries.map(e=>parseNum(e.Score_Wellness)));
-      const lw=avg(d.lastWeekEntries.map(e=>parseNum(e.Score_Wellness)));
-      return trendStatus(tw,lw)==="down";
+    if (filter === "sem-resposta") return !d.todayEntry;
+    if (filter === "caindo") {
+      const tw = avg(d.thisWeekEntries.map(e=>parseNum(e.Score_Wellness)));
+      const lw = avg(d.lastWeekEntries.map(e=>parseNum(e.Score_Wellness)));
+      return trendStatus(tw,lw) === "down";
     }
-    const cats=[...new Set(DEMO_ATHLETES.map(a=>a.Categoria))];
-    if(cats.includes(filter)) return d.athlete.Categoria===filter;
+    if (categories.includes(filter)) return d.athlete.Categoria === filter;
     return true;
   });
 
-  const categories=[...new Set(DEMO_ATHLETES.map(a=>a.Categoria))];
-  const selectedData = selected ? allData.find(d=>d.athlete.ID===selected) : null;
+  const selectedData = selected ? allData.find(d => (d.athlete.ID||d.athlete.id) === selected) : null;
 
-  return(
-    <div style={{minHeight:"100vh",background:C.bg}}>
+  if (loading) return (
+    <div style={{padding:40,textAlign:"center",color:C.muted}}>
+      <style>{GS}</style>
+      <div style={{fontSize:32,marginBottom:12}}>💚</div>
+      <div style={{letterSpacing:3,fontSize:13}}>CARREGANDO BEM-ESTAR...</div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{padding:32,textAlign:"center",maxWidth:440,margin:"0 auto"}}>
+      <style>{GS}</style>
+      <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
+      <div style={{color:"#ef4444",fontSize:16,marginBottom:8}}>Erro ao carregar dados</div>
+      <div style={{color:C.muted,fontSize:13,marginBottom:8}}>{error}</div>
+      <div style={{color:C.muted,fontSize:12,marginBottom:16}}>
+        Verifique se a planilha está compartilhada publicamente:<br/>
+        <span style={{color:C.blueLt,fontSize:11}}>Google Sheets → Compartilhar → Qualquer pessoa com o link → Leitor</span>
+      </div>
+      <button onClick={load} style={{background:C.blue,color:"#fff",border:"none",borderRadius:6,padding:"10px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:14}}>
+        Tentar novamente
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100%",background:C.bg}}>
       <style>{GS}</style>
 
-      {/* Header */}
-      <div style={{background:"#111111",borderBottom:`3px solid ${C.blue}`,padding:"0 20px"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:54}}>
-          <div style={{display:"flex",alignItems:"center",gap:14}}>
-            <svg width={36} height={36} viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="49" fill="#111"/>
-              <circle cx="50" cy="50" r="40" fill={C.blue}/>
-              <circle cx="50" cy="50" r="30" fill="#fff"/>
-              <text x="50" y="45" textAnchor="middle" fontSize="12" fontWeight="900" fontFamily="Arial" fill={C.blue}>ECP</text>
-              <text x="50" y="59" textAnchor="middle" fontSize="8" fontFamily="Arial" fill={C.blue}>PINHEIROS</text>
-            </svg>
-            <div>
-              <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:2}}>PINHEIROS <span style={{color:C.muted,fontSize:12,fontWeight:400}}>BEM-ESTAR</span></div>
-              <div style={{fontSize:10,color:C.muted,letterSpacing:1}}>{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})}</div>
-            </div>
-          </div>
-          <div style={{fontSize:11,color:C.muted,textAlign:"right"}}>
-            <div>⚠️ Demo — dados reais no site</div>
-            <div style={{color:"#374151"}}>Auto-atualiza a cada 5 min</div>
-          </div>
+      {/* Sub-header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:800}}>💚 Bem-Estar da Equipe</div>
+          <div style={{fontSize:12,color:C.muted}}>{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})}</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {lastUpdate&&<span style={{fontSize:11,color:C.muted}}>Atualizado: {lastUpdate.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span>}
+          <button onClick={load} style={{background:C.surfHi,border:`1px solid ${C.border}`,color:C.text,borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:700}}>↻ Atualizar</button>
         </div>
       </div>
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
+      {/* Summary */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:14}}>
+        {[
+          {icon:"🚣",label:"Total",val:athletes.length,c:C.blue},
+          {icon:"✅",label:"Responderam",val:responded,c:"#16a34a"},
+          {icon:"⏳",label:"Sem resposta",val:athletes.length-responded,c:C.muted},
+          {icon:"🔴",label:"Em alerta",val:alerts,c:"#dc2626"},
+        ].map(s=>(
+          <div key={s.label} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",borderTop:`2px solid ${s.c}`}}>
+            <div style={{fontSize:18}}>{s.icon}</div>
+            <div style={{fontSize:9,letterSpacing:2,color:C.muted,margin:"4px 0 1px",textTransform:"uppercase"}}>{s.label}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c}}>{s.val}</div>
+          </div>
+        ))}
+      </div>
 
-        {/* Summary */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:14}}>
-          {[
-            {icon:"🚣",label:"Total",val:DEMO_ATHLETES.length,c:C.blue},
-            {icon:"✅",label:"Responderam",val:responded,c:"#16a34a"},
-            {icon:"⏳",label:"Sem resposta",val:DEMO_ATHLETES.length-responded,c:C.muted},
-            {icon:"🔴",label:"Em alerta",val:alerts,c:"#dc2626"},
-          ].map(s=>(
-            <div key={s.label} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",borderTop:`2px solid ${s.c}`}}>
-              <div style={{fontSize:18}}>{s.icon}</div>
-              <div style={{fontSize:9,letterSpacing:2,color:C.muted,margin:"4px 0 1px",textTransform:"uppercase"}}>{s.label}</div>
-              <div style={{fontSize:26,fontWeight:900,color:s.c}}>{s.val}</div>
-            </div>
-          ))}
+      {/* Team trend */}
+      {allData.length > 0 && <TeamTrendPanel allData={allData}/>}
+
+      {/* Filters */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {["todos","alerta","sem-resposta","caindo",...categories].map(f=>(
+          <button key={f} onClick={()=>setFilter(f)}
+            style={{padding:"5px 12px",background:filter===f?C.blue:C.surfHi,color:filter===f?"#fff":C.muted,
+              border:`1px solid ${filter===f?C.blue:C.border}`,borderRadius:6,fontFamily:"inherit",
+              fontWeight:700,fontSize:11,cursor:"pointer",letterSpacing:1,transition:"all .15s",textTransform:"uppercase"}}>
+            {f==="todos"?"Todos":f==="alerta"?"🔴 Alerta":f==="sem-resposta"?"⏳ S/ Resposta":f==="caindo"?"↘ Caindo":f}
+          </button>
+        ))}
+      </div>
+
+      {/* Cards */}
+      {filtered.length === 0 ? (
+        <div style={{textAlign:"center",color:C.muted,padding:40,fontSize:14}}>
+          Nenhum atleta encontrado para este filtro.
         </div>
-
-        {/* Team trend panel */}
-        <TeamTrendPanel allData={allData}/>
-
-        {/* Filters */}
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-          {["todos","alerta","sem-resposta","caindo",...categories].map(f=>(
-            <button key={f} onClick={()=>setFilter(f)}
-              style={{padding:"5px 12px",background:filter===f?C.blue:C.surfHi,color:filter===f?"#fff":C.muted,
-                border:`1px solid ${filter===f?C.blue:C.border}`,borderRadius:6,fontFamily:"inherit",
-                fontWeight:700,fontSize:11,cursor:"pointer",letterSpacing:1,transition:"all .15s",textTransform:"uppercase"}}>
-              {f==="todos"?"Todos":f==="alerta"?"🔴 Alerta":f==="sem-resposta"?"⏳ S/ Resposta":f==="caindo"?"↘ Caindo":f}
-            </button>
-          ))}
-        </div>
-
-        {/* Cards */}
+      ) : (
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(255px,1fr))",gap:12}}>
           {filtered.map(d=>(
-            <AthleteCard key={d.athlete.ID} data={d} onClick={()=>setSelected(d.athlete.ID)}/>
+            <AthleteCard key={d.athlete.ID||d.athlete.id} data={d}
+              onClick={()=>setSelected(d.athlete.ID||d.athlete.id)}/>
           ))}
         </div>
+      )}
 
-        <div style={{marginTop:16,textAlign:"center",fontSize:11,color:"#1f2937"}}>
-          Visualização de demonstração · No site real os dados são sincronizados do Google Sheets automaticamente
-        </div>
-      </div>
-
-      {selectedData&&<Detail data={selectedData} onClose={()=>setSelected(null)}/>}
+      {selectedData && <Detail data={selectedData} onClose={()=>setSelected(null)}/>}
     </div>
   );
 }
