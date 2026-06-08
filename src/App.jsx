@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
+import WellnessDashboard from "./WellnessDashboard.jsx";
 
 // ─── DADOS INICIAIS ────────────────────────────────────────────────────────
 const SEED_ATHLETES = [
@@ -235,13 +236,7 @@ function SectionHead({ children }) {
 }
 function ECPLogo({ sz=40 }) {
   return (
-    <svg width={sz} height={sz} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="49" fill="#111111"/>
-      <circle cx="50" cy="50" r="40" fill={C.blue}/>
-      <circle cx="50" cy="50" r="30" fill="#ffffff"/>
-      <text x="50" y="45" textAnchor="middle" fontSize="13" fontWeight="900" fontFamily="Arial,sans-serif" fill={C.blue}>ECP</text>
-      <text x="50" y="60" textAnchor="middle" fontSize="8" fontWeight="600" fontFamily="Arial,sans-serif" fill={C.blue}>PINHEIROS</text>
-    </svg>
+    <img src="/logo.png" width={sz} height={sz} alt="EC Pinheiros" style={{objectFit:"contain",display:"block"}}/>
   );
 }
 function AppHeader({ nav, right }) {
@@ -747,7 +742,7 @@ function BestTimesAdmin({ bestTimes, onUpdate, onAdd, onDelete }) {
 // ─── ADMIN LAYOUT ─────────────────────────────────────────────────────────
 function AdminView({ session, athletes, trainings, bestTimes, onLogout, onAddAthlete, onDeleteAthlete, onAddTraining, onDeleteTraining, onUpdateBT, onAddBT, onDeleteBT }) {
   const [tab,setTab]=useState("dashboard");
-  const TABS=[{id:"dashboard",icon:"📊",label:"Dashboard"},{id:"trainings",icon:"📋",label:"Treinos"},{id:"athletes",icon:"🚣",label:"Atletas"},{id:"besttimes",icon:"🏆",label:"Best Times"}];
+  const TABS=[{id:"dashboard",icon:"📊",label:"Dashboard"},{id:"trainings",icon:"📋",label:"Treinos"},{id:"athletes",icon:"🚣",label:"Atletas"},{id:"besttimes",icon:"🏆",label:"Best Times"},{id:"wellness",icon:"💚",label:"Bem-Estar"}];
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:C.bg}}>
       <style>{GS}</style>
@@ -760,6 +755,7 @@ function AdminView({ session, athletes, trainings, bestTimes, onLogout, onAddAth
         {tab==="trainings"&&<AllTrainings athletes={athletes} trainings={trainings} bestTimes={bestTimes} onAdd={onAddTraining} onDelete={onDeleteTraining}/>}
         {tab==="athletes"&&<AthletesAdmin athletes={athletes} onAdd={onAddAthlete} onDelete={onDeleteAthlete}/>}
         {tab==="besttimes"&&<BestTimesAdmin bestTimes={bestTimes} onUpdate={onUpdateBT} onAdd={onAddBT} onDelete={onDeleteBT}/>}
+        {tab==="wellness"&&<WellnessDashboard/>}
       </div>
     </div>
   );
