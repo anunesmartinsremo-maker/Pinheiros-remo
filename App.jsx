@@ -394,7 +394,6 @@ function Login({ athletes, onLogin }) {
           )}
           {err&&<div style={{color:C.bad,fontSize:13,marginTop:10,textAlign:"center"}}>{err}</div>}
           <div style={{marginTop:14}}><Btn onClick={go} sz="lg" full>ENTRAR</Btn></div>
-          <div style={{marginTop:12,fontSize:11,color:C.muted,textAlign:"center"}}>{tab==="admin"?"Login: treinador / remo2025":"Senha: atleta2025"}</div>
         </Card>
       </div>
     </div>
