@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import WellnessDashboard from "./WellnessDashboard.jsx";
+import StepTestModule from "./StepTestModule.jsx";
 
 // ─── DADOS INICIAIS ────────────────────────────────────────────────────────
 const SEED_ATHLETES = [
@@ -463,6 +464,7 @@ function AthleteView({ session, athletes, trainings, bestTimes, onLogout, onAdd 
   const ath=athletes.find(a=>a.id===session.athleteId);
   const [showForm,setShowForm]=useState(false);
   const [rankTab,setRankTab]=useState("day");
+  const [athTab,setAthTab]=useState("trainings");
   const mine=[...trainings.filter(t=>t.athleteId===session.athleteId)].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   return (
     <div style={{minHeight:"100vh",background:C.bg}}>
@@ -474,7 +476,14 @@ function AthleteView({ session, athletes, trainings, bestTimes, onLogout, onAdd 
             <Card key={s.label} s={{padding:12,borderTop:`2px solid ${C.blue}`}}><Lbl>{s.label}</Lbl><div style={{fontSize:18,fontWeight:800,wordBreak:"break-all",lineHeight:1.2}}>{s.val}</div></Card>
           ))}
         </div>
-        <div style={{marginBottom:16}}>
+        {/* Athlete tab navigation */}
+        <div style={{display:"flex",gap:4,background:C.bg,borderRadius:8,padding:4,marginBottom:16}}>
+          {[["trainings","📋 Treinos"],["steptest","🔬 Step Test"]].map(([k,l])=>(
+            <button key={k} onClick={()=>setAthTab(k)} style={{flex:1,padding:"8px 0",background:athTab===k?C.blue:"transparent",color:athTab===k?"#fff":C.muted,border:"none",borderRadius:6,fontWeight:700,fontSize:13,cursor:"pointer",letterSpacing:1,transition:"all .15s"}}>{l}</button>
+          ))}
+        </div>
+        {athTab==="steptest"&&<StepTestModule session={session} athletes={athletes}/>}
+        {athTab==="trainings"&&<div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontSize:18,fontWeight:800}}>🏆 Ranking Proximidade à Meta</div>
             <div style={{display:"flex",gap:4,background:C.bg,borderRadius:6,padding:3}}>
@@ -505,6 +514,7 @@ function AthleteView({ session, athletes, trainings, bestTimes, onLogout, onAdd 
             </table>
           </div>
         </Card>
+        </div>}
       </div>
     </div>
   );
@@ -742,7 +752,7 @@ function BestTimesAdmin({ bestTimes, onUpdate, onAdd, onDelete }) {
 // ─── ADMIN LAYOUT ─────────────────────────────────────────────────────────
 function AdminView({ session, athletes, trainings, bestTimes, onLogout, onAddAthlete, onDeleteAthlete, onAddTraining, onDeleteTraining, onUpdateBT, onAddBT, onDeleteBT }) {
   const [tab,setTab]=useState("dashboard");
-  const TABS=[{id:"dashboard",icon:"📊",label:"Dashboard"},{id:"trainings",icon:"📋",label:"Treinos"},{id:"athletes",icon:"🚣",label:"Atletas"},{id:"besttimes",icon:"🏆",label:"Best Times"},{id:"wellness",icon:"💚",label:"Bem-Estar"}];
+  const TABS=[{id:"dashboard",icon:"📊",label:"Dashboard"},{id:"trainings",icon:"📋",label:"Treinos"},{id:"athletes",icon:"🚣",label:"Atletas"},{id:"besttimes",icon:"🏆",label:"Best Times"},{id:"wellness",icon:"💚",label:"Bem-Estar"},{id:"steptest",icon:"🔬",label:"Step Test"}];
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:C.bg}}>
       <style>{GS}</style>
@@ -756,6 +766,7 @@ function AdminView({ session, athletes, trainings, bestTimes, onLogout, onAddAth
         {tab==="athletes"&&<AthletesAdmin athletes={athletes} onAdd={onAddAthlete} onDelete={onDeleteAthlete}/>}
         {tab==="besttimes"&&<BestTimesAdmin bestTimes={bestTimes} onUpdate={onUpdateBT} onAdd={onAddBT} onDelete={onDeleteBT}/>}
         {tab==="wellness"&&<WellnessDashboard/>}
+        {tab==="steptest"&&<StepTestModule session={session} athletes={athletes}/>}
       </div>
     </div>
   );
